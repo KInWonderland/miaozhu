@@ -51,9 +51,15 @@ cd miaozhu
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python3.11 -m venv .venv
+source .venv/bin/activate
+
+python -m pip install --upgrade pip
+python -m pip install --no-cache-dir --index-url https://pypi.org/simple -r requirements.txt
+playwright install chromium
+
+source .venv/bin/activate
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 如果需要图表渲染功能（可选），安装 Playwright 浏览器：
@@ -409,7 +415,7 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: docker-compose.yml
     ports:
       - "8000:8000"
     volumes:
@@ -420,7 +426,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: docker-compose.yml
     ports:
       - "80:80"
     depends_on:

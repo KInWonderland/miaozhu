@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class CreateExportTaskRequest(BaseModel):
-    format: str  # manual-word / manual-pdf / source-code-word / source-code-pdf / all
+    format: str  # application-form-txt / manual-* / source-code-* / all
 
 
 class ExportTaskResponse(BaseModel):

@@ -126,7 +126,7 @@
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span>生成结果</span>
-          <el-tooltip content="提交导出任务，完成后可在下载记录中下载" placement="top">
+          <el-tooltip content="提交导出任务，完成后可在下方最近导出中下载" placement="top">
             <el-dropdown split-button type="primary" size="small" @click="handleExportManualWord" @command="handleExportCommand">
               <template v-if="exporting">
                 <el-icon class="is-loading"><Loading /></el-icon> 提交中...
@@ -134,6 +134,7 @@
               <template v-else>导出文档鉴别材料</template>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item command="application-form-txt">申请表信息（TXT）</el-dropdown-item>
                   <el-dropdown-item command="manual-word">文档鉴别材料（Word）</el-dropdown-item>
                   <el-dropdown-item command="manual-pdf">文档鉴别材料（PDF）</el-dropdown-item>
                   <el-dropdown-item divided command="source-code-word">源程序鉴别材料（Word）</el-dropdown-item>
@@ -313,7 +314,6 @@
               plain
               @click="handleCleanFailedExports"
             >清理失败任务</el-button>
-        <el-button link type="primary" @click="$router.push('/downloads')">查看全部</el-button>
           </div>
         </div>
       </template>
@@ -744,7 +744,7 @@ async function doExport(command: string) {
   exporting.value = command
   try {
     await exportApi.createExportTask(appId.value, { format: command as any })
-    ElMessage.success('导出任务已提交，请在下载记录中查看')
+    ElMessage.success('导出任务已提交，请在下方最近导出中查看')
     await fetchLatestExports()
     startExportSSE()
 
@@ -779,6 +779,7 @@ function exportStatusLabel(s: string) {
 
 function formatExportFormat(f: string) {
   const map: Record<string, string> = {
+    'application-form-txt': '申请表信息（TXT）',
     'manual-word': '文档鉴别材料（Word）',
     'manual-pdf': '文档鉴别材料（PDF）',
     'source-code-word': '源程序鉴别材料（Word）',

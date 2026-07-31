@@ -1,7 +1,13 @@
 import client from './client'
 
 export interface CreateExportTaskRequest {
-  format: 'manual-word' | 'manual-pdf' | 'source-code-word' | 'source-code-pdf' | 'all'
+  format:
+    | 'application-form-txt'
+    | 'manual-word'
+    | 'manual-pdf'
+    | 'source-code-word'
+    | 'source-code-pdf'
+    | 'all'
 }
 
 export interface ExportTaskRecord {

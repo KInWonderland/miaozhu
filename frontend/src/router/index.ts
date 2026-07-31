@@ -4,18 +4,12 @@ import type { RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/copyright',
   },
   {
     path: '/',
     component: () => import('@/layouts/MainLayout.vue'),
     children: [
-      {
-        path: 'dashboard',
-        name: 'Dashboard',
-        component: () => import('@/views/dashboard/DashboardView.vue'),
-        meta: { title: '工作台' },
-      },
       {
         path: 'copyright',
         name: 'CopyrightList',
@@ -40,31 +34,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/copyright/CopyrightEditView.vue'),
         meta: { title: '编辑申请信息' },
       },
-      {
-        path: 'tools',
-        name: 'Tools',
-        component: () => import('@/views/tools/ToolsView.vue'),
-        meta: { title: 'AI 工具' },
-      },
-      {
-        path: 'downloads',
-        name: 'Downloads',
-        component: () => import('@/views/downloads/DownloadRecordsView.vue'),
-        meta: { title: '下载记录' },
-      },
-      {
-        path: 'docs',
-        name: 'Docs',
-        component: () => import('@/views/docs/DocsView.vue'),
-        meta: { title: '使用文档' },
-      },
-      {
-        path: 'about',
-        name: 'About',
-        component: () => import('@/views/about/AboutView.vue'),
-        meta: { title: '关于我们' },
-      },
     ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/copyright',
   },
 ]
 

@@ -953,24 +953,31 @@ Order "1" --> "N" Product : 包含
 {
     "software_version": "V1.0",
     "software_category": "应用软件",
-    "completion_date": "2024-01-01",
-    "development_method": "独立开发",
-    "code_line_count": "约15000行",
-    "runtime_platform": "Windows/Linux/macOS",
-    "runtime_hardware": "PC服务器",
-    "runtime_software": "操作系统、浏览器",
-    "development_language": "相关编程语言",
-    "technical_features": "核心技术特点描述",
-    "work_type": "原始取得",
+    "completion_date": "YYYY-MM-DD",
+    "development_method": "单独开发",
+    "dev_hardware": "开发电脑配置，50字符以内",
+    "runtime_hardware": "实际部署或运行设备配置，50字符以内",
+    "dev_os": "开发电脑的操作系统，50字符以内",
+    "dev_tools": "实际使用的开发工具，50字符以内",
+    "runtime_platform": "实际运行平台或操作系统，50字符以内",
+    "runtime_software": "运行依赖或支持软件，50字符以内",
+    "development_language": "实际编程语言",
+    "code_line_count": "纯数字，不含“行”字",
+    "development_purpose": "一句话描述开发目的，50字符以内",
+    "target_industry": "面向领域或行业，50字符以内",
+    "technical_features": "技术特点标签及简述，100字符以内",
+    "work_type": "原创",
     "rights_acquisition": "原始取得",
     "rights_scope": "全部权利",
     "publish_status": "未发表"
 }
 
 注意：
-1. 根据软件的实际情况填写，不要使用占位符
+1. 结合软件名称、主要功能、模块设计及已有字段推断，不要使用占位符
 2. 只输出 JSON，不要有其他文字说明
-3. 所有值都是字符串类型""",
+3. 所有值都是字符串类型
+4. 不得编造著作权人、证件信息和首次发表日期
+5. 无法从软件信息合理推断的事实字段返回空字符串""",
     }
 
     def _build_context(self, app: Application) -> str:

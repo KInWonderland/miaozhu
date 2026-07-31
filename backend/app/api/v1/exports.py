@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,29 +14,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["文档导出"])
 
-VALID_FORMATS = {"manual-word", "manual-pdf", "source-code-word", "source-code-pdf", "all"}
-
-# Rate limits: (window_seconds, max_count, error_message)
-_RATE_LIMITS = [
-    (60, 2, "导出过于频繁，请 1 分钟后再试"),
-    (300, 10, "导出过于频繁，请稍后再试（5 分钟内最多 10 次）"),
-    (3600, 20, "导出过于频繁，请稍后再试（1 小时内最多 20 次）"),
-    (86400, 40, "今日导出次数已达上限（24 小时内最多 40 次）"),
-]
-
-
-async def _check_export_rate_limit(db: AsyncSession) -> None:
-    now = datetime.now(timezone.utc)
-    for window_seconds, max_count, message in _RATE_LIMITS:
-        since = now - timedelta(seconds=window_seconds)
-        result = await db.execute(
-            select(func.count(ExportTask.id)).where(
-                ExportTask.created_at >= since,
-            )
-        )
-        if result.scalar() >= max_count:
-            raise HTTPException(status_code=429, detail=message)
-
+VALID_FORMATS = {
+    "application-form-txt",
+    "manual-word",
+    "manual-pdf",
+    "source-code-word",
+    "source-code-pdf",
+    "all",
+}
 
 async def _validate_and_fix_task_consistency(tasks: list[ExportTask], db: AsyncSession) -> None:
     """验证导出任务状态与时间戳的一致性，修复不一致的任务
@@ -105,8 +90,6 @@ async def create_export_task(
     if data.format not in VALID_FORMATS:
         raise HTTPException(status_code=400, detail=f"不支持的导出格式: {data.format}")
 
-    await _check_export_rate_limit(db)
-
     result = await db.execute(
         select(Application).where(Application.id == app_id)
     )
@@ -118,6 +101,7 @@ async def create_export_task(
 
     # 预填文件名（带软件名），完成时 scheduler 会用最终名覆盖
     fmt_label = {
+        "application-form-txt": "申请表信息",
         "manual-word": "文档鉴别材料",
         "manual-pdf": "文档鉴别材料",
         "source-code-word": "源程序鉴别材料",
@@ -125,6 +109,7 @@ async def create_export_task(
         "all": "全部材料",
     }
     ext_map = {
+        "application-form-txt": "txt",
         "manual-word": "docx", "manual-pdf": "pdf",
         "source-code-word": "docx", "source-code-pdf": "pdf",
         "all": "zip",

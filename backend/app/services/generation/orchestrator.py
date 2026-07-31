@@ -19,10 +19,11 @@ logger = logging.getLogger(__name__)
 # 申请表中可自动填充的字段
 AUTOFILL_FIELDS = [
     "software_version", "software_category", "completion_date",
-    "development_method", "code_line_count", "runtime_platform",
-    "runtime_hardware", "runtime_software", "development_language",
-    "technical_features", "work_type", "rights_acquisition",
-    "rights_scope", "publish_status",
+    "development_method", "code_line_count", "dev_hardware",
+    "dev_os", "dev_tools", "runtime_platform", "runtime_hardware",
+    "runtime_software", "development_language", "development_purpose",
+    "target_industry", "technical_features", "work_type",
+    "rights_acquisition", "rights_scope", "publish_status",
 ]
 
 

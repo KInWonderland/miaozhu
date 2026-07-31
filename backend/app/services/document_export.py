@@ -11,7 +11,6 @@ import re
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
@@ -220,6 +219,34 @@ def _add_page_numbers(doc: Document) -> None:
         fld_end = OxmlElement('w:fldChar')
         fld_end.set(qn('w:fldCharType'), 'end')
         run3._r.append(fld_end)
+
+
+def _normalized_version(app: Application) -> str:
+    """返回统一的版本号展示格式。"""
+    version = (app.software_version or "V1.0").strip()
+    if not version.lower().startswith("v"):
+        version = f"V{version}"
+    return version
+
+
+def _add_document_headers(doc: Document, app: Application) -> None:
+    """给文档所有节添加“软件名 + 版本号”页眉。"""
+    header_text = _clean(
+        f"{app.software_name or '软件系统'}  {_normalized_version(app)}"
+    )
+    for section in doc.sections:
+        header = section.header
+        header.is_linked_to_previous = False
+        paragraph = (
+            header.paragraphs[0]
+            if header.paragraphs
+            else header.add_paragraph()
+        )
+        paragraph.text = ""
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = paragraph.add_run(header_text)
+        run.font.size = Pt(9)
+        _set_cn_font(run, "宋体")
 
 
 def _add_heading(doc: Document, text: str, level: int = 1) -> None:
@@ -766,9 +793,7 @@ def _add_cover_page(doc: Document, app: Application, doc_title: str) -> None:
     _set_cn_font(run2, "黑体")
 
     # 版本号
-    version = app.software_version or "V1.0"
-    if not version.startswith("V") and not version.startswith("v"):
-        version = f"V{version}"
+    version = _normalized_version(app)
     p3 = doc.add_paragraph()
     p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p3.paragraph_format.space_after = Cm(4)
@@ -813,8 +838,9 @@ def _add_cover_page(doc: Document, app: Application, doc_title: str) -> None:
     doc.add_page_break()
 
 
-def _save_doc(doc: Document) -> io.BytesIO:
-    """添加页码并保存到 BytesIO"""
+def _save_doc(doc: Document, app: Application) -> io.BytesIO:
+    """添加页眉、页码并保存到 BytesIO。"""
+    _add_document_headers(doc, app)
     _add_page_numbers(doc)
     buf = io.BytesIO()
     doc.save(buf)
@@ -1015,76 +1041,99 @@ def export_manual_to_word(
         counter = _HeadingCounter(i + 1)
         _add_manual_content(doc, content, counter=counter, skip_first_h1=title, render_diagrams=render_diagrams)
 
-    return _save_doc(doc)
+    return _save_doc(doc, app)
 
 
 def export_source_code_to_word(
     app: Application, sections: list[GenerationSection]
 ) -> io.BytesIO:
-    """导出「源程序鉴别材料」Word 文档（数据库设计 + 源程序代码）
+    """导出「源程序鉴别材料」Word 文档。
 
-    数据库设计：宋体 12pt，固定行距 22pt
-    源程序代码：Times New Roman 10.5pt，固定行距 13pt，~53 行/页（≥50 行）
+    正文从第一页直接输出代码，不添加封面、目录、章节标题或数据库说明。
     """
     doc = _init_word_doc()
 
-    db_sections = [s for s in sections if s.section_key.startswith("db_design")]
     code_sections = [s for s in sections if s.section_key.startswith("source_code_")]
+    for section in code_sections:
+        if section.content:
+            _add_source_code_content(doc, section.content)
 
-    # 构建目录条目
-    toc_entries: list[tuple[int, str]] = []
-    chapter_num = 0
-    if db_sections:
-        chapter_num += 1
-        cn = _CN_CHAPTER_NUMS[chapter_num - 1]
-        toc_entries.append((1, f"{cn}、数据库设计"))
-        for s in db_sections:
-            if s.content:
-                h2_count = 0
-                h3_count = 0
-                for h_level, h_title in _extract_headings(s.content):
-                    if h_level == 1:
-                        h2_count += 1
-                        h3_count = 0
-                        toc_entries.append((2, f"{chapter_num}.{h2_count}  {h_title}"))
-                    elif h_level >= 2:
-                        h3_count += 1
-                        toc_entries.append((3, f"{chapter_num}.{h2_count}.{h3_count}  {h_title}"))
-    if code_sections:
-        chapter_num += 1
-        cn = _CN_CHAPTER_NUMS[chapter_num - 1]
-        toc_entries.append((1, f"{cn}、源程序代码"))
+    return _save_doc(doc, app)
 
-    # 封面（含分页符）
-    _add_cover_page(doc, app, "源程序鉴别材料")
 
-    # 目录
-    _add_word_toc(doc, toc_entries)
+def _application_text_value(value, default: str = "待填写") -> str:
+    """将申请表字段转换成附件风格的纯文本。"""
+    if value is None or str(value).strip() == "":
+        return default
+    return _clean(str(value).strip())
 
-    # 数据库设计
-    ch = 0
-    if db_sections:
-        ch += 1
-        cn = _CN_CHAPTER_NUMS[ch - 1]
-        _add_heading(doc, f"{cn}、数据库设计", level=1)
-        counter = _HeadingCounter(ch)
-        for section in db_sections:
-            if section.content:
-                # 数据库设计一般不会有重复标题，传 None
-                _add_manual_content(doc, section.content, counter=counter, skip_first_h1=None)
 
-    # 源程序代码
-    if code_sections:
-        ch += 1
-        if db_sections:
-            doc.add_page_break()
-        cn = _CN_CHAPTER_NUMS[ch - 1]
-        _add_heading(doc, f"{cn}、源程序代码", level=1)
-        for section in code_sections:
-            if section.content:
-                _add_source_code_content(doc, section.content)
+def _development_environment(app: Application) -> str:
+    """组合“软件开发环境 / 开发工具”字段。"""
+    tools = _application_text_value(app.dev_tools)
+    if "开发环境:" in tools or "开发环境：" in tools:
+        return tools
+    os_name = _application_text_value(app.dev_os)
+    return f"开发环境: {os_name}/开发工具: {tools}"
 
-    return _save_doc(doc)
+
+def _source_material_page_count(
+    sections: list[GenerationSection] | None,
+) -> str:
+    """按源程序鉴别材料每页 50 行估算实际页数。"""
+    if not sections:
+        return "待填写"
+    line_count = 0
+    for section in sections:
+        if not section.section_key.startswith("source_code_") or not section.content:
+            continue
+        lines = [
+            line
+            for line in section.content.strip().splitlines()
+            if not line.strip().startswith("```")
+        ]
+        line_count += len(lines)
+    return str((line_count + 49) // 50) if line_count else "待填写"
+
+
+def export_application_form_to_txt(
+    app: Application, sections: list[GenerationSection] | None = None
+) -> io.BytesIO:
+    """按用户提供的申请表样式导出 UTF-8 TXT。"""
+    first_publish_date = (
+        ""
+        if app.publish_status == "未发表"
+        else _application_text_value(app.first_publish_date)
+    )
+    fields = [
+        ("软件全称", _application_text_value(app.software_name)),
+        ("软件简称", _application_text_value(app.software_short_name)),
+        ("版本号", _normalized_version(app)),
+        ("软件分类", _application_text_value(app.software_category, "应用软件")),
+        ("开发完成日期", _application_text_value(app.completion_date)),
+        ("开发方式", _application_text_value(app.development_method, "单独开发")),
+        ("软件说明", _application_text_value(app.work_type, "原创")),
+        ("发表状态", _application_text_value(app.publish_status, "未发表")),
+        ("首次发表日期", first_publish_date),
+        ("著作权人", _application_text_value(app.applicant_name)),
+        ("权利范围", _application_text_value(app.rights_scope, "全部权利")),
+        ("权利取得方式", _application_text_value(app.rights_acquisition, "原始取得")),
+        ("开发的硬件环境", _application_text_value(app.dev_hardware)),
+        ("运行的硬件环境", _application_text_value(app.runtime_hardware)),
+        ("开发该软件的操作系统", _application_text_value(app.dev_os)),
+        ("软件开发环境 / 开发工具", _development_environment(app)),
+        ("该软件的运行平台 / 操作系统", _application_text_value(app.runtime_platform)),
+        ("软件运行支撑环境 / 支持软件", _application_text_value(app.runtime_software)),
+        ("编程语言", _application_text_value(app.development_language)),
+        ("源程序量", _application_text_value(app.code_line_count)),
+        ("开发目的", _application_text_value(app.development_purpose)),
+        ("面向领域 / 行业", _application_text_value(app.target_industry)),
+        ("软件的主要功能", _application_text_value(app.main_features)),
+        ("软件的技术特点", _application_text_value(app.technical_features)),
+        ("页数", _source_material_page_count(sections)),
+    ]
+    content = "\n".join(f"➤{label}：{value}" for label, value in fields) + "\n"
+    return io.BytesIO(content.encode("utf-8"))
 
 
 def export_to_word(
@@ -1124,7 +1173,7 @@ def export_to_word(
             if section.content:
                 _add_source_code_content(doc, section.content)
 
-    return _save_doc(doc)
+    return _save_doc(doc, app)
 
 
 # ==================== PDF 导出 ====================
@@ -1397,7 +1446,7 @@ def export_manual_to_pdf(
 ) -> io.BytesIO:
     """导出「文档鉴别材料」PDF（操作说明书）
 
-    先生成 Word 文档，再通过 Aspose.Words 转换为 PDF，排版更准确。
+    先生成 Word 文档，再通过 LibreOffice 转换为 PDF，排版更准确。
     """
     docx_buf = export_manual_to_word(app, sections)
     return _docx_to_pdf(docx_buf)
@@ -1406,9 +1455,9 @@ def export_manual_to_pdf(
 def export_source_code_to_pdf(
     app: Application, sections: list[GenerationSection]
 ) -> io.BytesIO:
-    """导出「源程序鉴别材料」PDF（数据库设计 + 源程序代码）
+    """导出「源程序鉴别材料」PDF（仅源程序代码）
 
-    先生成 Word 文档，再通过 Aspose.Words 转换为 PDF，排版更准确。
+    先生成 Word 文档，再通过 LibreOffice 转换为 PDF，排版更准确。
     """
     docx_buf = export_source_code_to_word(app, sections)
     return _docx_to_pdf(docx_buf)
@@ -1419,7 +1468,7 @@ def export_to_pdf(
 ) -> io.BytesIO:
     """导出合并 PDF 文档（向后兼容）
 
-    先生成 Word 文档，再通过 Aspose.Words 转换为 PDF。
+    先生成 Word 文档，再通过 LibreOffice 转换为 PDF。
     """
     docx_buf = export_to_word(app, sections)
     return _docx_to_pdf(docx_buf)

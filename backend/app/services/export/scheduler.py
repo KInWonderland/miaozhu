@@ -19,6 +19,7 @@ from app.models.export_task import ExportTask
 from app.models.application import Application
 from app.models.generation import GenerationTask, GenerationSection
 from app.services.document_export import (
+    export_application_form_to_txt,
     export_manual_to_word,
     export_manual_to_pdf,
     export_source_code_to_word,
@@ -114,6 +115,7 @@ async def _cancel_stale_tasks(running_tasks: dict[int, asyncio.Task]) -> None:
 def _build_file_path(task_id: int, fmt: str) -> str:
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     ext_map = {
+        "application-form-txt": "txt",
         "manual-word": "docx",
         "manual-pdf": "pdf",
         "source-code-word": "docx",
@@ -127,6 +129,7 @@ def _build_file_name(software_name: str, fmt: str) -> str:
     name = software_name or "export"
     ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     name_map = {
+        "application-form-txt": f"{name}-申请表信息-{ts}.txt",
         "manual-word": f"{name}-文档鉴别材料-{ts}.docx",
         "manual-pdf": f"{name}-文档鉴别材料-{ts}.pdf",
         "source-code-word": f"{name}-源程序鉴别材料-{ts}.docx",
@@ -137,6 +140,7 @@ def _build_file_name(software_name: str, fmt: str) -> str:
 
 
 _EXPORT_FUNCS = {
+    "application-form-txt": export_application_form_to_txt,
     "manual-word": export_manual_to_word,
     "manual-pdf": export_manual_to_pdf,
     "source-code-word": export_source_code_to_word,
@@ -190,6 +194,7 @@ def _generate_all_zip(app, sections) -> bytes:
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for fmt, label, ext in [
+            ("application-form-txt", "申请表信息", "txt"),
             ("manual-word", "文档鉴别材料", "docx"),
             ("manual-pdf", "文档鉴别材料", "pdf"),
             ("source-code-word", "源程序鉴别材料", "docx"),
