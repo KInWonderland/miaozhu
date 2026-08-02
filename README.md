@@ -102,6 +102,16 @@ pnpm dev
 
 > 开发模式下，前端通过 Vite 代理自动将 `/api` 请求转发到 `http://localhost:8000`。
 
+## Docker 与生产部署
+
+本地容器运行使用同一套 Dockerfile：
+
+```bash
+docker compose up --build
+```
+
+访问 `http://localhost:5173`。生产环境通过 GitHub Actions 构建镜像、推送到 GHCR，再由服务器拉取并启动；完整首次部署、密钥配置、日常发布和回滚步骤见 [部署指南](docs/部署指南-GitHub-Actions-GHCR.md)。
+
 ---
 
 ## 使用指南

@@ -16,7 +16,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "5173:5173"
+      # 前端镜像内使用 Nginx，实际监听 80；主机仍通过 5173 访问。
+      - "5173:80"
     depends_on:
       - backend
     restart: always
