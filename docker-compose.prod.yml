@@ -7,6 +7,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        # 腾讯云内网镜像，加速 Debian 软件包与 PyPI 依赖下载。
+        DEBIAN_MIRROR: mirrors.tencentyun.com
+        PIP_INDEX_URL: http://mirrors.tencentyun.com/pypi/simple/
+        PIP_TRUSTED_HOST: mirrors.tencentyun.com
+        # 可替换为自建制品库；默认使用国内 Playwright 下载镜像。
+        PLAYWRIGHT_DOWNLOAD_HOST: https://cdn.npmmirror.com/binaries/playwright
     image: miaozhu-backend:local
     env_file:
       # 此文件只保存在服务器，不能提交到 Git。

@@ -1,11 +1,13 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-slim AS build
 WORKDIR /app
 
 # 1. 复制 package.json 和 npm 的 lock 文件
 COPY package.json package-lock.json ./
 
-# 2. 使用 npm ci 进行严格安装（相当于 pnpm 的 --frozen-lockfile，速度更快且更稳定）
-RUN npm ci
+# 2. 使用锁文件严格安装。下载缓存会保留在构建服务器，依赖变化时无需重复下载已有包。
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci --prefer-offline --no-audit
 
 # 3. 复制其余项目文件并打包
 COPY . .
