@@ -110,7 +110,7 @@ pnpm dev
 docker compose up --build
 ```
 
-访问 `http://localhost:5173`。生产环境通过 GitHub Actions 构建镜像、推送到 GHCR，再由服务器拉取并启动；完整首次部署、密钥配置、日常发布和回滚步骤见 [部署指南](docs/部署指南-GitHub-Actions-GHCR.md)。
+访问 `http://localhost:5173`。生产环境由 GitHub Actions 连接腾讯云服务器：服务器拉取最新代码后，在本机构建并启动 Docker 容器；完整首次部署、密钥配置、日常发布和回滚步骤见 [部署指南](docs/部署指南-GitHub-Actions-GHCR.md)。
 
 ---
 
