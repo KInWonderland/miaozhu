@@ -44,7 +44,7 @@ cd /home/ubuntu/env && git pull --ff-only
 
 ## 三、配置现有 Nginx 反向代理
 
-生产容器只监听服务器本机的 `127.0.0.1:8080`，不再直接占用公网 80 端口。请保留服务器已有的 Nginx，并在对应站点的 `server` 块中加入以下配置（将 `<你的域名>` 替换为实际域名）：
+生产容器只监听服务器本机的 `127.0.0.1:5173`，不再直接占用公网 80 端口。请保留服务器已有的 Nginx，并在对应站点的 `server` 块中加入以下配置（将 `<你的域名>` 替换为实际域名）：
 
 ```nginx
 server {
@@ -52,7 +52,7 @@ server {
     server_name <你的域名>;
 
     location / {
-        proxy_pass http://127.0.0.1:8080;
+        proxy_pass http://127.0.0.1:5173;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -133,7 +133,7 @@ sudo tar -C /var/lib -czf ~/miaozhu-data-$(date +%F).tar.gz miaozhuData
 
 **Actions 连接服务器后 `git pull` 失败**：确认服务器上的 `ubuntu` 用户能无交互拉取 `/home/ubuntu/miaozhu` 与 `/home/ubuntu/env` 中的 Git 仓库；私有仓库还要确认部署密钥已被 GitHub 授权。
 
-**容器启动后页面无法打开**：确认 Nginx 已将请求转发至 `http://127.0.0.1:8080`，并使用 `docker compose -f docker-compose.prod.yml ps` 检查前端容器是否正在运行。
+**容器启动后页面无法打开**：确认 Nginx 已将请求转发至 `http://127.0.0.1:5173`，并使用 `docker compose -f docker-compose.prod.yml ps` 检查前端容器是否正在运行。
 
 **后端报 LLM 配置错误**：检查 `/home/ubuntu/env/miaozhu/.env` 的值和文件权限；不要将该文件复制进 Docker 镜像。
 
