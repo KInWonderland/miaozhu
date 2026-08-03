@@ -1,10 +1,10 @@
 name: miaozhu
 
-# 生产环境只拉取 GitHub Actions 已构建的镜像，不在服务器上构建源码。
+# 生产环境只拉取 GitHub Actions 推送到腾讯云 TCR 的镜像，不在服务器上构建源码。
 # 启动时使用：IMAGE_TAG=<Git commit SHA> docker compose -f docker-compose.prod.yml up -d
 services:
   backend:
-    image: ghcr.io/kinwonderland/miaozhu-backend:${IMAGE_TAG:?请设置 IMAGE_TAG}
+    image: ${TCR_REGISTRY:?请设置 TCR_REGISTRY}/${TCR_NAMESPACE:?请设置 TCR_NAMESPACE}/miaozhu-backend:${IMAGE_TAG:?请设置 IMAGE_TAG}
     env_file:
       # 此文件只保存在服务器，不能提交到 Git。
       - /home/ubuntu/env/miaozhu/.env
@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/kinwonderland/miaozhu-frontend:${IMAGE_TAG:?请设置 IMAGE_TAG}
+    image: ${TCR_REGISTRY:?请设置 TCR_REGISTRY}/${TCR_NAMESPACE:?请设置 TCR_NAMESPACE}/miaozhu-frontend:${IMAGE_TAG:?请设置 IMAGE_TAG}
     ports:
       - "80:80"
     depends_on:

@@ -12,16 +12,16 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/kinwonderland/miaozhu-backend
-  FRONTEND_IMAGE: ghcr.io/kinwonderland/miaozhu-frontend
+  TCR_REGISTRY: ${{ vars.TCR_REGISTRY }}
+  TCR_NAMESPACE: ${{ vars.TCR_NAMESPACE }}
+  BACKEND_IMAGE: ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/miaozhu-backend
+  FRONTEND_IMAGE: ${{ vars.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/miaozhu-frontend
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - name: Check out source
@@ -30,12 +30,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Sign in to GitHub Container Registry
+      - name: Sign in to Tencent Cloud Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ${{ env.TCR_REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
 
       - name: Build and push backend
         uses: docker/build-push-action@v6
@@ -59,19 +59,27 @@ jobs:
 
       - name: Pull images and restart services on server
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          TCR_REGISTRY: ${{ env.TCR_REGISTRY }}
+          TCR_NAMESPACE: ${{ env.TCR_NAMESPACE }}
+          TCR_USERNAME: ${{ secrets.TCR_USERNAME }}
+          TCR_PASSWORD: ${{ secrets.TCR_PASSWORD }}
+          IMAGE_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: TCR_REGISTRY,TCR_NAMESPACE,TCR_USERNAME,TCR_PASSWORD,IMAGE_TAG
           script: |
             set -eu
             cd /home/ubuntu/env
             git pull
             cd /home/ubuntu/miaozhu
             git pull
-            IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml pull
-            IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml ps
+            printf '%s' "$TCR_PASSWORD" | docker login "$TCR_REGISTRY" --username "$TCR_USERNAME" --password-stdin
+            TCR_REGISTRY="$TCR_REGISTRY" TCR_NAMESPACE="$TCR_NAMESPACE" IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml pull
+            TCR_REGISTRY="$TCR_REGISTRY" TCR_NAMESPACE="$TCR_NAMESPACE" IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            TCR_REGISTRY="$TCR_REGISTRY" TCR_NAMESPACE="$TCR_NAMESPACE" IMAGE_TAG="$IMAGE_TAG" docker compose -f docker-compose.prod.yml ps
 
       - name: Notify Telegram about deployment
         if: success()
