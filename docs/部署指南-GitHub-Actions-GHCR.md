@@ -42,7 +42,33 @@ cd /home/ubuntu/miaozhu && git pull --ff-only
 cd /home/ubuntu/env && git pull --ff-only
 ```
 
-## 三、配置 GitHub Actions Secrets
+## 三、配置现有 Nginx 反向代理
+
+生产容器只监听服务器本机的 `127.0.0.1:8080`，不再直接占用公网 80 端口。请保留服务器已有的 Nginx，并在对应站点的 `server` 块中加入以下配置（将 `<你的域名>` 替换为实际域名）：
+
+```nginx
+server {
+    listen 80;
+    server_name <你的域名>;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+保存配置后在服务器验证并重载 Nginx：
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+## 四、配置 GitHub Actions Secrets
 
 在仓库的 **Settings → Secrets and variables → Actions** 中新增以下 Repository secrets：
 
@@ -64,7 +90,7 @@ ssh-keygen -t ed25519 -C "github-actions-miaozhu-deploy"
 
 将公钥内容追加到服务器目标用户的 `~/.ssh/authorized_keys`；私钥全文填入 `SERVER_SSH_KEY`。建议该用户仅拥有维护 `/home/ubuntu/miaozhu`、`/var/lib/miaozhuData` 和运行 Docker 的必要权限，并关闭密码登录。
 
-## 四、首次发布
+## 五、首次发布
 
 确认工作流文件、生产 Compose 文件和 Docker 忽略文件已提交至默认分支，然后推送：
 
@@ -76,7 +102,7 @@ git push origin main
 
 进入 GitHub 仓库 **Actions → Deploy to Tencent Cloud** 查看运行日志。服务器拉取最新代码后，会使用 `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans` 在本机构建镜像并启动容器。前端默认暴露在 `http://<服务器地址>/`，后端不直接暴露公网端口，仅由前端 Nginx 转发 `/api/` 请求。服务成功启动后，工作流会向 `TELEGRAM_TO` 指定的聊天发送仓库、提交 SHA 和服务器地址。
 
-## 五、日常发布、检查与回滚
+## 六、日常发布、检查与回滚
 
 以后每次向 `main` 推送，都会自动发布。每次发布都会先在 `/home/ubuntu/env` 和 `/home/ubuntu/miaozhu` 执行 `git pull --ff-only`，再在腾讯云服务器上构建镜像并重启容器；因此这两个目录须是部署用户可访问的 Git 工作树，且已配置好拉取远程仓库所需的认证。可在服务器检查状态和日志：
 
@@ -103,11 +129,11 @@ docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 sudo tar -C /var/lib -czf ~/miaozhu-data-$(date +%F).tar.gz miaozhuData
 ```
 
-## 六、常见问题
+## 七、常见问题
 
 **Actions 连接服务器后 `git pull` 失败**：确认服务器上的 `ubuntu` 用户能无交互拉取 `/home/ubuntu/miaozhu` 与 `/home/ubuntu/env` 中的 Git 仓库；私有仓库还要确认部署密钥已被 GitHub 授权。
 
-**容器启动后页面无法打开**：检查服务器的 80 端口是否已被 Nginx、Caddy 或其他服务占用；如已有反向代理，应把生产 Compose 的前端端口映射改为 `127.0.0.1:8080:80`，再由反向代理转发。
+**容器启动后页面无法打开**：确认 Nginx 已将请求转发至 `http://127.0.0.1:8080`，并使用 `docker compose -f docker-compose.prod.yml ps` 检查前端容器是否正在运行。
 
 **后端报 LLM 配置错误**：检查 `/home/ubuntu/env/miaozhu/.env` 的值和文件权限；不要将该文件复制进 Docker 镜像。
 

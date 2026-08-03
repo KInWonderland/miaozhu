@@ -29,7 +29,8 @@ services:
       dockerfile: Dockerfile
     image: miaozhu-frontend:local
     ports:
-      - "80:80"
+      # 公网 80 端口由服务器现有的 Nginx/Caddy 占用；仅向本机反向代理开放。
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
     restart: unless-stopped
