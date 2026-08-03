@@ -68,6 +68,7 @@ jobs:
             cd /home/ubuntu/env
             git pull
             cd /home/ubuntu/miaozhu
+            git pull
             IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml pull
             IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml up -d --remove-orphans
             IMAGE_TAG="${{ github.sha }}" docker compose -f docker-compose.prod.yml ps
