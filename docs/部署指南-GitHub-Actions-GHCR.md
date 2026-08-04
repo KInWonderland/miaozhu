@@ -44,12 +44,36 @@ cd /home/ubuntu/env && git pull --ff-only
 
 ## 三、配置现有 Nginx 反向代理
 
-生产容器只监听服务器本机的 `127.0.0.1:5173`，不再直接占用公网 80 端口。请保留服务器已有的 Nginx，并在对应站点的 `server` 块中加入以下配置（将 `<你的域名>` 替换为实际域名）：
+生产容器只监听服务器本机的 `127.0.0.1:5173`，不再直接占用公网 80/443 端口。请保留服务器已有的 Nginx；不要修改原项目的站点配置，而是为本项目新增一个按子域名匹配的站点。
+
+项目提供了 Nginx 模板 `deploy/nginx/miaozhu.conf.template`。在服务器为子域名设置环境变量后，渲染并启用该独立站点配置：
+
+```bash
+export MIAOZHU_DOMAIN=miaozhu.example.com
+envsubst '${MIAOZHU_DOMAIN}' < /home/ubuntu/miaozhu/deploy/nginx/miaozhu.conf.template \
+  | sudo tee /etc/nginx/sites-available/miaozhu >/dev/null
+sudo ln -s /etc/nginx/sites-available/miaozhu /etc/nginx/sites-enabled/miaozhu
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+其中 `MIAOZHU_DOMAIN` 替换为你准备解析到此服务器的子域名。下面是渲染后的配置示例：
 
 ```nginx
 server {
     listen 80;
-    server_name <你的域名>;
+    server_name miaozhu.example.com;
+
+    location /api/v1/sse/ {
+        proxy_pass http://127.0.0.1:5173;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 600s;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:5173;
@@ -58,14 +82,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
     }
 }
 ```
 
-保存配置后在服务器验证并重载 Nginx：
+Nginx 会按请求域名选择站点，因此原项目和本项目可共享公网 80/443 端口；`reload` 为平滑重载，不会中断原项目正在处理的请求。DNS 生效后，为新子域名申请证书：
 
 ```bash
-sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d "$MIAOZHU_DOMAIN"
 ```
 
 ## 四、配置 GitHub Actions Secrets
