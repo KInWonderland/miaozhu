@@ -28,9 +28,19 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     image: miaozhu-frontend:local
-    ports:
-      # 公网 80 端口由服务器现有的 Nginx/Caddy 占用；仅向本机反向代理开放。
-      - "127.0.0.1:5173:80"
+    networks:
+      default:
+      public-gateway:
+        aliases:
+          - miaozhu-frontend
     depends_on:
       - backend
     restart: unless-stopped
+
+networks:
+  # Created and owned by the standalone gateway-nginx project. This lets the
+  # gateway proxy to the frontend without publishing any application port on
+  # the host.
+  public-gateway:
+    external: true
+    name: public-gateway

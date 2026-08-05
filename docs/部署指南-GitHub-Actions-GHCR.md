@@ -42,55 +42,20 @@ cd /home/ubuntu/miaozhu && git pull --ff-only
 cd /home/ubuntu/env && git pull --ff-only
 ```
 
-## 三、配置现有 Nginx 反向代理
+## 三、接入独立 Nginx 网关
 
-生产容器只监听服务器本机的 `127.0.0.1:5173`，不再直接占用公网 80/443 端口。请保留服务器已有的 Nginx；不要修改原项目的站点配置，而是为本项目新增一个按子域名匹配的站点。
+生产 Compose 不再映射宿主机端口，前端仅通过 Docker 网络由独立的 `gateway-nginx` 项目访问。网关是服务器唯一绑定公网 80/443 的服务，负责根据子域名选择站点、加载腾讯云证书，并将请求转发到本服务的 `miaozhu-frontend` 容器。
 
-项目提供了 Nginx 模板 `deploy/nginx/miaozhu.conf.template`。在服务器为子域名设置环境变量后，渲染并启用该独立站点配置：
-
-```bash
-export MIAOZHU_DOMAIN=miaozhu.example.com
-envsubst '${MIAOZHU_DOMAIN}' < /home/ubuntu/miaozhu/deploy/nginx/miaozhu.conf.template \
-  | sudo tee /etc/nginx/sites-available/miaozhu >/dev/null
-sudo ln -s /etc/nginx/sites-available/miaozhu /etc/nginx/sites-enabled/miaozhu
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-其中 `MIAOZHU_DOMAIN` 替换为你准备解析到此服务器的子域名。下面是渲染后的配置示例：
-
-```nginx
-server {
-    listen 80;
-    server_name miaozhu.example.com;
-
-    location /api/v1/sse/ {
-        proxy_pass http://127.0.0.1:5173;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 600s;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:5173;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 300s;
-    }
-}
-```
-
-Nginx 会按请求域名选择站点，因此原项目和本项目可共享公网 80/443 端口；`reload` 为平滑重载，不会中断原项目正在处理的请求。DNS 生效后，为新子域名申请证书：
+首次部署前，在服务器创建一次共享网络：
 
 ```bash
-sudo certbot --nginx -d "$MIAOZHU_DOMAIN"
+docker network create public-gateway
+```
+
+然后按 `/home/ubuntu/gateway-nginx/README.md` 配置 `MIAOZHU_DOMAIN`、腾讯云证书路径和网关服务。妙著自身不再需要创建宿主机 Nginx 配置，也不再使用 `5173`。生产域名仍需要写入后端环境文件：
+
+```env
+CORS_ORIGINS=["https://miaozhu.example.com"]
 ```
 
 ## 四、配置 GitHub Actions Secrets
@@ -125,7 +90,7 @@ git commit -m "ci: build containers on deployment server"
 git push origin main
 ```
 
-进入 GitHub 仓库 **Actions → Deploy to Tencent Cloud** 查看运行日志。服务器拉取最新代码后，会使用 `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans` 在本机构建镜像并启动容器。前端默认暴露在 `http://<服务器地址>/`，后端不直接暴露公网端口，仅由前端 Nginx 转发 `/api/` 请求。服务成功启动后，工作流会向 `TELEGRAM_TO` 指定的聊天发送仓库、提交 SHA 和服务器地址。
+进入 GitHub 仓库 **Actions → Deploy to Tencent Cloud** 查看运行日志。服务器拉取最新代码后，会使用 `docker compose -f docker-compose.prod.yml up -d --build --remove-orphans` 在本机构建镜像并启动容器。前端和后端均不直接暴露公网端口；独立 `gateway-nginx` 会通过 `public-gateway` Docker 网络将子域名请求转发到前端，前端再将 `/api/` 转发到后端。服务成功启动后，工作流会向 `TELEGRAM_TO` 指定的聊天发送仓库、提交 SHA 和服务器地址。
 
 ## 六、日常发布、检查与回滚
 
@@ -158,7 +123,7 @@ sudo tar -C /var/lib -czf ~/miaozhu-data-$(date +%F).tar.gz miaozhuData
 
 **Actions 连接服务器后 `git pull` 失败**：确认服务器上的 `ubuntu` 用户能无交互拉取 `/home/ubuntu/miaozhu` 与 `/home/ubuntu/env` 中的 Git 仓库；私有仓库还要确认部署密钥已被 GitHub 授权。
 
-**容器启动后页面无法打开**：确认 Nginx 已将请求转发至 `http://127.0.0.1:5173`，并使用 `docker compose -f docker-compose.prod.yml ps` 检查前端容器是否正在运行。
+**容器启动后页面无法打开**：使用 `docker compose -f docker-compose.prod.yml ps` 确认前端容器正在运行，并在 `/home/ubuntu/gateway-nginx` 执行 `docker compose ps` 与 `docker compose logs --tail=100 gateway` 检查统一网关是否能连接到 `miaozhu-frontend`。
 
 **后端报 LLM 配置错误**：检查 `/home/ubuntu/env/miaozhu/.env` 的值和文件权限；不要将该文件复制进 Docker 镜像。
 
