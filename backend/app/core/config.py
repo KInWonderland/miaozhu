@@ -1,6 +1,18 @@
-from pydantic_settings import BaseSettings
+import logging
+import os
+from pathlib import Path
+from threading import RLock
 from typing import List
 import json
+
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+
+logger = logging.getLogger(__name__)
+
+# Allow a deployment to provide an alternate file, while keeping the existing
+# `backend/.env` behaviour for local development and containers.
+ENV_FILE = Path(os.environ.get("MIAOZHU_ENV_FILE", ".env"))
 
 
 class Settings(BaseSettings):
@@ -52,7 +64,73 @@ class Settings(BaseSettings):
                 "登录功能尚未配置，请在环境变量中设置：" + ", ".join(missing)
             )
 
-    model_config = {"env_file": ".env", "extra": "ignore"}
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        """Prefer the file so editing it can update container configuration too.
+
+        Docker Compose's ``env_file`` copies values into the process environment
+        at container creation.  The default Pydantic source order would keep
+        those stale process values ahead of a subsequently edited ``.env``.
+        """
+        return init_settings, dotenv_settings, env_settings, file_secret_settings
 
 
-settings = Settings()
+class ReloadableSettings:
+    """A lazy settings proxy that reloads a changed dotenv file atomically."""
+
+    def __init__(self) -> None:
+        self._lock = RLock()
+        self._current: Settings | None = None
+        self._fingerprint: tuple[int, int, int] | None = None
+
+    @staticmethod
+    def _file_fingerprint() -> tuple[int, int, int] | None:
+        try:
+            stat = ENV_FILE.stat()
+        except FileNotFoundError:
+            return None
+        return stat.st_ino, stat.st_size, stat.st_mtime_ns
+
+    def get(self) -> Settings:
+        """Return the latest valid settings, retaining the last valid version.
+
+        An editor may briefly leave a file incomplete while saving it.  In that
+        case, running work continues with the last valid configuration and an
+        error is logged until the file is fixed.
+        """
+        fingerprint = self._file_fingerprint()
+        with self._lock:
+            if self._current is not None and fingerprint == self._fingerprint:
+                return self._current
+
+            try:
+                updated = Settings()
+            except Exception:
+                if self._current is None:
+                    raise
+                logger.exception(
+                    "Ignoring invalid configuration reload from %s; retaining the last valid settings",
+                    ENV_FILE,
+                )
+                self._fingerprint = fingerprint
+                return self._current
+
+            self._current = updated
+            self._fingerprint = fingerprint
+            logger.info("Configuration loaded from %s", ENV_FILE)
+            return updated
+
+    def __getattr__(self, name: str):
+        return getattr(self.get(), name)
+
+
+settings = ReloadableSettings()

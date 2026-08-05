@@ -18,9 +18,14 @@ services:
     env_file:
       # 此文件只保存在服务器，不能提交到 Git。
       - /home/ubuntu/env/miaozhu/.env
+    environment:
+      # 运行时读取目录挂载内的文件，避免 env_file 在容器创建时固定配置。
+      MIAOZHU_ENV_FILE: /app-config/.env
     volumes:
       # SQLite 数据库和导出文件必须持久化，升级镜像不会清除它们。
       - /var/lib/miaozhuData:/app/data
+      # 挂载目录（而非单个文件），保证原子保存后的新文件也能被检测到。
+      - /home/ubuntu/env/miaozhu:/app-config:ro
     restart: unless-stopped
 
   frontend:

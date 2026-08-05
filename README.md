@@ -627,7 +627,9 @@ PDF 导出依赖 Playwright 浏览器引擎。请确保已运行 `playwright ins
 
 **Q: 如何更换 LLM 模型？**
 
-修改 `.env` 中的 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 三项即可，无需重启服务（下次生成任务会使用新配置）。支持任何兼容 OpenAI Chat Completions API 的服务。
+修改 `backend/.env` 中的 `LLM_BASE_URL`、`LLM_API_KEY`、`LLM_MODEL` 三项即可，无需重启服务；下次开始的生成任务会自动使用新配置。运行中的任务继续使用开始时的配置。Docker 部署已将配置目录以只读方式挂载到容器，直接编辑宿主机的 `.env` 即可。
+
+`SCHEDULER_POLL_INTERVAL` 和两个 `SCHEDULER_MAX_CONCURRENT_*` 参数也会在下一轮调度时读取新值。`DATABASE_URL`、`CORS_ORIGINS` 与 Session 配置属于进程启动期配置，修改后仍需重启后端才会完全生效。
 
 **Q: 数据库文件越来越大？**
 

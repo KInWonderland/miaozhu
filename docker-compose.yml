@@ -5,10 +5,15 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    environment:
+      # Read the bind-mounted file at runtime instead of the initial env_file copy.
+      MIAOZHU_ENV_FILE: /app-config/.env
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data        # 持久化数据库和导出文件
+      # Mount the directory (not only the file) so atomic editor saves are visible.
+      - ./backend:/app-config:ro
     restart: always
 
   frontend:

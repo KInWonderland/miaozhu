@@ -37,18 +37,20 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             docker compose -f docker-compose.prod.yml ps
 
-      - name: Notify Telegram about deployment
-        if: success()
-        env:
-          TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          DEPLOY_SHA: ${{ github.sha }}
-          DEPLOY_REPOSITORY: ${{ github.repository }}
-          DEPLOY_SERVER: ${{ secrets.SERVER_HOST }}
-        run: |
-          telegram_text=$(printf '✅ 部署成功\n仓库：%s\n提交：%s\n服务器：%s' \
-            "$DEPLOY_REPOSITORY" "$DEPLOY_SHA" "$DEPLOY_SERVER")
-          curl --fail --silent --show-error --request POST \
-            --url "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
-            --data-urlencode "chat_id=${TELEGRAM_TO}" \
-            --data-urlencode "text=${telegram_text}"
+      # ================== 发送 Telegram 通知 ==================
+      - name: Send Telegram Notification
+        if: always() # 无论前面打包是成功还是失败，都一定会发送通知
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown  # 使用 Markdown 格式美化排版
+          message: |
+            *📢 GitHub Actions 运行报告*
+
+            *构建状态*：${{ job.status == 'success' && '✅ 打包成功' || '❌ 打包失败' }}
+            *项目名称*：`${{ github.repository }}`
+            *触发分支*：`${{ github.ref_name }}`
+            *最新提交*：_${{ github.event.head_commit.message }}_
+
+            [点击查看完整构建日志](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})

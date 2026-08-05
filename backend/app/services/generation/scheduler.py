@@ -26,12 +26,16 @@ TASK_TIMEOUT_MINUTES = 30  # 任务超时时间（分钟）
 
 # 进程内全局信号量
 _llm_semaphore: asyncio.Semaphore | None = None
+_llm_semaphore_limit: int | None = None
 
 
 def _get_semaphore() -> asyncio.Semaphore:
-    global _llm_semaphore
-    if _llm_semaphore is None:
-        _llm_semaphore = asyncio.Semaphore(settings.SCHEDULER_MAX_CONCURRENT_LLM)
+    global _llm_semaphore, _llm_semaphore_limit
+    limit = settings.SCHEDULER_MAX_CONCURRENT_LLM
+    if _llm_semaphore is None or _llm_semaphore_limit != limit:
+        _llm_semaphore = asyncio.Semaphore(limit)
+        _llm_semaphore_limit = limit
+        logger.info("Generation LLM concurrency set to %d", limit)
     return _llm_semaphore
 
 
@@ -301,12 +305,11 @@ async def _run_section(section_id: int, running: dict[int, asyncio.Task]) -> Non
 # ── 主循环 ─────────────────────────────────────────────────
 
 async def run_scheduler() -> None:
-    poll = settings.SCHEDULER_POLL_INTERVAL
-    max_llm = settings.SCHEDULER_MAX_CONCURRENT_LLM
-
     logger.info(
         "Generation scheduler started (poll=%ds, max_concurrent_llm=%d, timeout=%dmin)",
-        poll, max_llm, TASK_TIMEOUT_MINUTES,
+        settings.SCHEDULER_POLL_INTERVAL,
+        settings.SCHEDULER_MAX_CONCURRENT_LLM,
+        TASK_TIMEOUT_MINUTES,
     )
 
     # 启动时恢复被中断的任务
@@ -318,6 +321,9 @@ async def run_scheduler() -> None:
     try:
         while True:
             try:
+                # Settings are read in each loop so a changed .env is applied
+                # before dispatching the next unit of work.
+                max_llm = settings.SCHEDULER_MAX_CONCURRENT_LLM
                 # 检查超时任务
                 await _cancel_stale_tasks(running_tasks)
 
@@ -340,7 +346,7 @@ async def run_scheduler() -> None:
 
             except Exception:
                 logger.exception("Scheduler error")
-            await asyncio.sleep(poll)
+            await asyncio.sleep(settings.SCHEDULER_POLL_INTERVAL)
     finally:
         # 取消所有正在执行的任务
         for tid, atask in running_tasks.items():

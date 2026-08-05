@@ -32,12 +32,16 @@ logger = logging.getLogger(__name__)
 TASK_TIMEOUT_MINUTES = 30
 
 _semaphore: asyncio.Semaphore | None = None
+_semaphore_limit: int | None = None
 
 
 def _get_semaphore() -> asyncio.Semaphore:
-    global _semaphore
-    if _semaphore is None:
-        _semaphore = asyncio.Semaphore(settings.SCHEDULER_MAX_CONCURRENT_EXPORT)
+    global _semaphore, _semaphore_limit
+    limit = settings.SCHEDULER_MAX_CONCURRENT_EXPORT
+    if _semaphore is None or _semaphore_limit != limit:
+        _semaphore = asyncio.Semaphore(limit)
+        _semaphore_limit = limit
+        logger.info("Export concurrency set to %d", limit)
     return _semaphore
 
 
@@ -271,9 +275,11 @@ async def _process_export(task_id: int, running_tasks: dict[int, asyncio.Task]) 
 # ── 主循环 ──
 
 async def run_export_scheduler() -> None:
-    poll = settings.SCHEDULER_POLL_INTERVAL
-
-    logger.info("Export scheduler started (poll=%ds, timeout=%dmin)", poll, TASK_TIMEOUT_MINUTES)
+    logger.info(
+        "Export scheduler started (poll=%ds, timeout=%dmin)",
+        settings.SCHEDULER_POLL_INTERVAL,
+        TASK_TIMEOUT_MINUTES,
+    )
 
     # 启动时恢复被中断的任务
     await _recover_interrupted_tasks()
@@ -293,7 +299,7 @@ async def run_export_scheduler() -> None:
                         running_tasks[task_id] = atask
             except Exception:
                 logger.exception("Export scheduler error")
-            await asyncio.sleep(poll)
+            await asyncio.sleep(settings.SCHEDULER_POLL_INTERVAL)
     finally:
         # 取消所有正在执行的任务
         for tid, atask in running_tasks.items():
