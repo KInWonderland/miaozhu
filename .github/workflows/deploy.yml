@@ -28,6 +28,10 @@ jobs:
             set -eu
             cd /home/ubuntu/env
             git pull --ff-only
+            test -f /home/ubuntu/env/miaozhu/.env
+            docker network inspect public-gateway >/dev/null 2>&1 || \
+              docker network create public-gateway || \
+              docker network inspect public-gateway >/dev/null 2>&1
             cd /home/ubuntu/miaozhu
             git pull --ff-only
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans

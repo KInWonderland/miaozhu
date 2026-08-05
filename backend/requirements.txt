@@ -1,4 +1,5 @@
 fastapi[standard]
+itsdangerous
 uvicorn[standard]
 sqlalchemy[asyncio]
 aiosqlite

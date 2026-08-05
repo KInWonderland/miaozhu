@@ -112,6 +112,38 @@ docker compose up --build
 
 访问 `http://localhost:5173`。生产环境由 GitHub Actions 连接腾讯云服务器：服务器拉取最新代码后，在本机构建并启动 Docker 容器；完整首次部署、密钥配置、日常发布和回滚步骤见 [部署指南](docs/部署指南-GitHub-Actions-GHCR.md)。
 
+### GitHub Actions Repository Secrets
+
+生产工作流会先执行 `cd /home/ubuntu/env && git pull --ff-only`，再读取
+`/home/ubuntu/env/miaozhu/.env` 并部署当前项目。请在仓库 **Settings →
+Secrets and variables → Actions** 中配置：
+
+| Secret | 用途 |
+| --- | --- |
+| `SERVER_HOST` | 腾讯云服务器公网 IP 或主机名。 |
+| `SERVER_USER` | 服务器 SSH 登录用户。 |
+| `SERVER_SSH_KEY` | GitHub Actions 登录服务器所用 SSH 私钥全文。 |
+| `TELEGRAM_TO` | 接收部署成功通知的 Telegram chat ID。 |
+| `TELEGRAM_TOKEN` | 发送通知的 Telegram Bot Token。 |
+
+### 登录与会话配置
+
+秒著的全部 API（包括 SSE 与下载）均由服务端 Session 中间件保护；仅
+`POST /api/v1/auth/login` 可在未登录时访问。部署前请在
+`/home/ubuntu/env/miaozhu/.env` 增加以下变量，**不要**使用示例密码或将其
+提交到业务代码仓库：
+
+```dotenv
+AUTH_USERNAME=your-admin-name
+AUTH_PASSWORD=use-a-long-unique-password
+SESSION_SECRET=use-a-random-long-secret
+SESSION_MAX_AGE_SECONDS=604800
+SESSION_HTTPS_ONLY=true
+```
+
+生产环境已经由 HTTPS 网关提供服务，因此 `SESSION_HTTPS_ONLY` 必须为
+`true`；本地 `http://localhost:5173` 开发时改为 `false`。
+
 ---
 
 ## 使用指南

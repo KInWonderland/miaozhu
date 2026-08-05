@@ -27,6 +27,31 @@ class Settings(BaseSettings):
     # Export data directory
     EXPORT_DATA_DIR: str = "data/exports"
 
+    # Session login. These values are supplied through the deployment
+    # environment, never hard-coded into an image or source file.
+    AUTH_USERNAME: str = ""
+    AUTH_PASSWORD: str = ""
+    SESSION_SECRET: str = ""
+    SESSION_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 7
+    # Keep this false for local HTTP development. HTTPS production deployments
+    # must set it to true so browsers never send a session over plain HTTP.
+    SESSION_HTTPS_ONLY: bool = False
+
+    def validate_auth_configuration(self) -> None:
+        missing = [
+            name
+            for name, value in (
+                ("AUTH_USERNAME", self.AUTH_USERNAME),
+                ("AUTH_PASSWORD", self.AUTH_PASSWORD),
+                ("SESSION_SECRET", self.SESSION_SECRET),
+            )
+            if not value.strip()
+        ]
+        if missing:
+            raise RuntimeError(
+                "登录功能尚未配置，请在环境变量中设置：" + ", ".join(missing)
+            )
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 

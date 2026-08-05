@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from starlette.middleware.sessions import SessionMiddleware
 
 
 def _setup_logging():
@@ -43,7 +44,8 @@ logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 from app.core.database import init_db
-from app.api.v1 import applications, dashboard, generation, exports, sse
+from app.api.v1 import applications, auth, dashboard, generation, exports, sse
+from app.middleware import SessionAuthenticationMiddleware
 from app.services.generation.scheduler import run_scheduler
 from app.services.export.scheduler import run_export_scheduler
 
@@ -71,6 +73,8 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    settings.validate_auth_configuration()
+
     app = FastAPI(
         title="秒著 API",
         description="AI 辅助生成软件著作权申请材料",
@@ -78,7 +82,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS
+    # Middleware is added inside-out: CORS wraps SessionMiddleware, which wraps
+    # the authentication guard. This lets preflight requests receive CORS
+    # headers while allowing the guard to read the decoded signed session.
+    app.add_middleware(SessionAuthenticationMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=settings.SESSION_SECRET,
+        max_age=settings.SESSION_MAX_AGE_SECONDS,
+        same_site="lax",
+        https_only=settings.SESSION_HTTPS_ONLY,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -89,6 +103,7 @@ def create_app() -> FastAPI:
 
     # Routes
     prefix = "/api/v1"
+    app.include_router(auth.router, prefix=prefix)
     app.include_router(applications.router, prefix=prefix)
     app.include_router(dashboard.router, prefix=prefix)
     app.include_router(generation.router, prefix=prefix)

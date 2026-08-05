@@ -1,4 +1,5 @@
 export { default as client } from './client'
+export * as authApi from './auth'
 export * as applicationApi from './application'
 export * as generationApi from './generation'
 export * as exportApi from './export'

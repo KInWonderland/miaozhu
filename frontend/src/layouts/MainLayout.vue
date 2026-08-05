@@ -3,6 +3,7 @@
     <el-container>
       <el-header class="main-header">
         <el-button text type="primary" @click="router.push('/copyright')">首页</el-button>
+        <el-button text @click="handleLogout">退出登录</el-button>
       </el-header>
 
       <el-main class="main-content">
@@ -13,9 +14,21 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { authApi } from '@/api'
 
 const router = useRouter()
+
+async function handleLogout() {
+  try {
+    await authApi.logout()
+    ElMessage.success('已退出登录')
+    await router.replace('/login')
+  } catch {
+    // The global interceptor already displays the error and redirects if needed.
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -26,7 +39,7 @@ const router = useRouter()
 .main-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   border-bottom: 1px solid $border-color;
   background: #fff;
 }
