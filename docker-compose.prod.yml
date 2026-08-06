@@ -23,7 +23,7 @@ services:
       MIAOZHU_ENV_FILE: /app-config/.env
     volumes:
       # SQLite 数据库和导出文件必须持久化，升级镜像不会清除它们。
-      - /var/lib/miaozhuData:/app/data
+      - /var/lib/miaozhu/data:/app/data
       # 挂载目录（而非单个文件），保证原子保存后的新文件也能被检测到。
       - /home/ubuntu/env/miaozhu:/app-config:ro
     restart: unless-stopped

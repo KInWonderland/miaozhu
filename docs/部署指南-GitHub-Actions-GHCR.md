@@ -6,7 +6,7 @@
 
 ## 一、首次准备服务器
 
-以下示例以 Ubuntu/Debian 服务器、`/home/ubuntu/miaozhu` 为部署目录、`/home/ubuntu/env` 为已克隆的环境配置 Git 仓库（其中包含 `miaozhu/.env`）、`/var/lib/miaozhuData` 为数据库与导出文件持久化目录。服务器需要安装 Docker Engine、Docker Compose Plugin 和 Git，并能够从 GitHub 拉取代码。确认命令如下：
+以下示例以 Ubuntu/Debian 服务器、`/home/ubuntu/miaozhu` 为部署目录、`/home/ubuntu/env` 为已克隆的环境配置 Git 仓库（其中包含 `miaozhu/.env`）、`/var/lib/miaozhu/data` 为数据库与导出文件持久化目录。服务器需要安装 Docker Engine、Docker Compose Plugin 和 Git，并能够从 GitHub 拉取代码。确认命令如下：
 
 ```bash
 docker --version
@@ -17,8 +17,8 @@ git --version
 创建部署目录和数据目录，并将项目仓库与环境配置仓库分别克隆到服务器：
 
 ```bash
-sudo mkdir -p /home/ubuntu/miaozhu /var/lib/miaozhuData
-sudo chown -R ubuntu:ubuntu /home/ubuntu/miaozhu /var/lib/miaozhuData
+sudo mkdir -p /home/ubuntu/miaozhu /var/lib/miaozhu/data
+sudo chown -R ubuntu:ubuntu /home/ubuntu/miaozhu /var/lib/miaozhu/data
 git clone <项目仓库地址> /home/ubuntu/miaozhu
 git clone <环境配置仓库地址> /home/ubuntu/env
 sudo chown -R ubuntu:ubuntu /home/ubuntu/env
@@ -78,7 +78,7 @@ CORS_ORIGINS=["https://miaozhu.example.com"]
 ssh-keygen -t ed25519 -C "github-actions-miaozhu-deploy"
 ```
 
-将公钥内容追加到服务器目标用户的 `~/.ssh/authorized_keys`；私钥全文填入 `SERVER_SSH_KEY`。建议该用户仅拥有维护 `/home/ubuntu/miaozhu`、`/var/lib/miaozhuData` 和运行 Docker 的必要权限，并关闭密码登录。
+将公钥内容追加到服务器目标用户的 `~/.ssh/authorized_keys`；私钥全文填入 `SERVER_SSH_KEY`。建议该用户仅拥有维护 `/home/ubuntu/miaozhu`、`/var/lib/miaozhu/data` 和运行 Docker 的必要权限，并关闭密码登录。
 
 ## 五、首次发布
 
@@ -113,10 +113,10 @@ docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 
 回滚完成后，请执行 `git checkout main`，以保证后续自动部署可以正常执行 `git pull --ff-only`。
 
-`/var/lib/miaozhuData` 是数据库与导出文件的持久化目录，升级与回滚容器都不会删除它。升级前应定期备份：
+`/var/lib/miaozhu/data` 是数据库与导出文件的持久化目录，升级与回滚容器都不会删除它。升级前应定期备份：
 
 ```bash
-sudo tar -C /var/lib -czf ~/miaozhu-data-$(date +%F).tar.gz miaozhuData
+sudo tar -C /var/lib/miaozhu -czf ~/miaozhu-data-$(date +%F).tar.gz data
 ```
 
 ## 七、常见问题
